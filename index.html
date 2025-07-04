@@ -222,5 +222,70 @@
   </script>
 <script async="" defer="" onload="gapiLoaded()" src="https://apis.google.com/js/api.js"></script>
 <script async="" defer="" onload="gisLoaded()" src="https://accounts.google.com/gsi/client"></script>
-</body>
+<script>
+let folderId = null;
+let openBtn = document.getElementById('openDriveBtn');
+
+async function ensureFolderAndFile() {
+  const folderRes = await gapi.client.drive.files.list({
+    q: "mimeType='application/vnd.google-apps.folder' and name='FiguresBase' and trashed=false",
+    fields: "files(id, name)"
+  });
+  if (folderRes.result.files.length > 0) {
+    folderId = folderRes.result.files[0].id;
+  } else {
+    const folderMetadata = {
+      name: "FiguresBase",
+      mimeType: "application/vnd.google-apps.folder"
+    };
+    const folderCreate = await gapi.client.drive.files.create({
+      resource: folderMetadata,
+      fields: "id"
+    });
+    folderId = folderCreate.result.id;
+  }
+
+  const fileRes = await gapi.client.drive.files.list({
+    q: `'${folderId}' in parents and name='figures.json' and trashed=false`,
+    fields: "files(id, name)"
+  });
+
+  if (fileRes.result.files.length > 0) {
+    fileId = fileRes.result.files[0].id;
+    const file = await gapi.client.drive.files.get({ fileId, alt: 'media' });
+    data = JSON.parse(file.body);
+  } else {
+    const blob = new Blob([JSON.stringify([])], { type: 'application/json' });
+    const metadata = { name: 'figures.json', mimeType: 'application/json', parents: [folderId] };
+    const form = new FormData();
+    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+    form.append('file', blob);
+    const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+      method: 'POST',
+      headers: new Headers({ 'Authorization': 'Bearer ' + gapi.auth.getToken().access_token }),
+      body: form
+    });
+    const result = await res.json();
+    fileId = result.id;
+    data = [];
+  }
+
+  openBtn.style.display = '';
+  openBtn.onclick = () => {
+    window.open(`https://drive.google.com/file/d/${fileId}/view`, '_blank');
+  };
+}
+
+handleAuthClick = function () {
+  tokenClient.callback = async (resp) => {
+    if (resp.error !== undefined) throw resp;
+    document.getElementById('status').textContent = '🔐 Підключено до Google Drive';
+    document.getElementById('loginBtn').style.display = 'none';
+    document.getElementById('addForm').style.display = '';
+    await ensureFolderAndFile();
+    render();
+  };
+  tokenClient.requestAccessToken({ prompt: 'consent' });
+};
+</script></body>
 </html>
