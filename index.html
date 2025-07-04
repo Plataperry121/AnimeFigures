@@ -1,11 +1,12 @@
 <!DOCTYPE html>
+
 <html lang="uk">
 <head>
-  <meta charset="UTF-8">
-  <title>Фігуркова база — Google Drive версія</title>
-  <script src="https://apis.google.com/js/api.js"></script>
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <style>
+<meta charset="utf-8"/>
+<title>Фігуркова база — Google Drive версія</title>
+<script src="https://apis.google.com/js/api.js"></script>
+<script async="" defer="" src="https://accounts.google.com/gsi/client"></script>
+<style>
     body {
       font-family: sans-serif;
       padding: 20px;
@@ -48,44 +49,43 @@
   </style>
 </head>
 <body>
-  <div class="main">
-    <h1>Моя база аніме-фігурок (Google Drive)</h1>
-    <div id="status">Не підключено до Google</div>
-    <button id="loginBtn" onclick="handleAuthClick()">Увійти з Google</button>
-    <form id="addForm" style="display:none;">
-      <input type="url" id="link" placeholder="Посилання на джерело (Telegram, Instagram...)" required>
-      <input type="file" id="imgFile" accept="image/*">
-      <input type="text" id="release" placeholder="Дата виходу (напр. 12.2025)">
-      <input type="text" id="price" placeholder="Ціна ($ або грн)">
-      <label><input type="checkbox" id="preorder"> Передзамовлено</label>
-      <label><input type="checkbox" id="deposit"> Передплата</label>
-      <label><input type="checkbox" id="paid"> Повна оплата</label>
-      <button type="submit">Додати</button>
-    </form>
-
-    <table id="figuresTable">
-      <thead>
-        <tr>
-          <th>Фото</th>
-          <th>Посилання</th>
-          <th>Дата виходу</th>
-          <th>Ціна</th>
-          <th>Передзамовлено</th>
-          <th>Передплата</th>
-          <th>Повна оплата</th>
-          <th>✖</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
-  </div>
-  <div class="sidebar">
-    <h3>Передперегляд</h3>
-    <div id="imagePreviewBox">
-      <img id="previewImage" src="https://via.placeholder.com/300x300?text=Preview" alt="preview">
-    </div>
-  </div>
-  <script>
+<div class="main">
+<h1>Моя база аніме-фігурок (Google Drive)</h1>
+<div id="status">Не підключено до Google</div>
+<button id="loginBtn" onclick="handleAuthClick()">Увійти з Google</button><button id="openDriveBtn" style="display:none;" type="button">Відкрити JSON у Google Drive</button>
+<form id="addForm" style="display:none;">
+<input id="link" placeholder="Посилання на джерело (Telegram, Instagram...)" required="" type="url"/>
+<input accept="image/*" id="imgFile" type="file"/>
+<input id="release" placeholder="Дата виходу (напр. 12.2025)" type="text"/>
+<input id="price" placeholder="Ціна ($ або грн)" type="text"/>
+<label><input id="preorder" type="checkbox"/> Передзамовлено</label>
+<label><input id="deposit" type="checkbox"/> Передплата</label>
+<label><input id="paid" type="checkbox"/> Повна оплата</label>
+<button type="submit">Додати</button>
+</form>
+<table id="figuresTable">
+<thead>
+<tr>
+<th>Фото</th>
+<th>Посилання</th>
+<th>Дата виходу</th>
+<th>Ціна</th>
+<th>Передзамовлено</th>
+<th>Передплата</th>
+<th>Повна оплата</th>
+<th>✖</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+</div>
+<div class="sidebar">
+<h3>Передперегляд</h3>
+<div id="imagePreviewBox">
+<img alt="preview" id="previewImage" src="https://via.placeholder.com/300x300?text=Preview"/>
+</div>
+</div>
+<script>
     const CLIENT_ID = '647188066279-5rakesgjmesas5sev9td6u05t4ib7ea0.apps.googleusercontent.com';
     const SCOPES = 'https://www.googleapis.com/auth/drive.file';
     let tokenClient;
@@ -220,7 +220,7 @@
     window.gapiLoaded = gapiLoaded;
     window.gisLoaded = gisLoaded;
   </script>
-  <script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
-  <script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
+<script async="" defer="" onload="gapiLoaded()" src="https://apis.google.com/js/api.js"></script>
+<script async="" defer="" onload="gisLoaded()" src="https://accounts.google.com/gsi/client"></script>
 </body>
 </html>
