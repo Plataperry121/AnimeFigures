@@ -52,7 +52,7 @@
 <div class="main">
 <h1>Моя база аніме-фігурок (Google Drive)</h1>
 <div id="status">Не підключено до Google</div>
-<button id="loginBtn" onclick="handleAuthClick()">Увійти з Google</button><button id="openDriveBtn" style="display:none;" type="button">Відкрити JSON у Google Drive</button>
+<button id="loginBtn" onclick="handleAuthClick()">Увійти з Google</button><button id="openDriveBtn" style="display:none; margin-left:10px;" type="button">Відкрити JSON у Google Drive</button><button id="openDriveBtn" style="display:none;" type="button">Відкрити JSON у Google Drive</button>
 <form id="addForm" style="display:none;">
 <input id="link" placeholder="Посилання на джерело (Telegram, Instagram...)" required="" type="url"/>
 <input accept="image/*" id="imgFile" type="file"/>
@@ -68,11 +68,11 @@
 <tr>
 <th>Фото</th>
 <th>Посилання</th>
-<th>Дата виходу</th>
-<th>Ціна</th>
-<th>Передзамовлено</th>
-<th>Передплата</th>
-<th>Повна оплата</th>
+<th class="clickable" id="sortRelease">Дата виходу</th>
+<th class="clickable" id="sortPrice">Ціна</th>
+<th class="clickable" id="sortPreorder">Передзамовлено</th>
+<th class="clickable" id="sortDeposit">Передплата</th>
+<th class="clickable" id="sortPaid">Повна оплата</th>
 <th>✖</th>
 </tr>
 </thead>
@@ -333,5 +333,51 @@ handleAuthClick = function () {
   };
   tokenClient.requestAccessToken({ prompt: 'consent' });
 };
+</script><script>
+let sortState = {
+  release: 1,
+  price: 1,
+  preorder: 1,
+  deposit: 1,
+  paid: 1
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+  const byId = id => document.getElementById(id);
+
+  byId('sortRelease')?.addEventListener('click', () => {
+    sortState.release *= -1;
+    data.sort((a, b) => (a.release || '').localeCompare(b.release || '') * sortState.release);
+    render();
+  });
+
+  byId('sortPrice')?.addEventListener('click', () => {
+    sortState.price *= -1;
+    data.sort((a, b) => {
+      const aPrice = parseFloat((a.price || '').replace(/[^\d\.]/g, '')) || 0;
+      const bPrice = parseFloat((b.price || '').replace(/[^\d\.]/g, '')) || 0;
+      return (aPrice - bPrice) * sortState.price;
+    });
+    render();
+  });
+
+  byId('sortPreorder')?.addEventListener('click', () => {
+    sortState.preorder *= -1;
+    data.sort((a, b) => ((a.preorder === b.preorder) ? 0 : a.preorder ? -1 : 1) * sortState.preorder);
+    render();
+  });
+
+  byId('sortDeposit')?.addEventListener('click', () => {
+    sortState.deposit *= -1;
+    data.sort((a, b) => ((a.deposit === b.deposit) ? 0 : a.deposit ? -1 : 1) * sortState.deposit);
+    render();
+  });
+
+  byId('sortPaid')?.addEventListener('click', () => {
+    sortState.paid *= -1;
+    data.sort((a, b) => ((a.paid === b.paid) ? 0 : a.paid ? -1 : 1) * sortState.paid);
+    render();
+  });
+});
 </script></body>
 </html>
