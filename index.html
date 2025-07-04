@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+
+<html lang="uk">
+<head>
+<meta charset="utf-8"/>
+<title>Фігуркова база — Google Drive версія</title>
+<script src="https://apis.google.com/js/api.js"></script>
+<script async="" defer="" src="https://accounts.google.com/gsi/client"></script>
+<style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+      display: flex;
+      background: #1e1e1e;
+      color: #f0f0f0;
+    }
+    .main { flex: 1; }
+    .sidebar { width: 400px; margin-left: 20px; }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 20px;
+      background: #2a2a2a;
+    }
+    th, td {
+      border: 1px solid #444;
+      padding: 10px;
+      text-align: center;
+      cursor: default;
+    }
+    th { background: #333; }
+    tr:nth-child(even) { background: #242424; }
+    img { max-height: 100px; }
+    input, button {
+      margin: 5px;
+      padding: 5px;
+      background: #333;
+      color: #fff;
+      border: 1px solid #555;
+    }
+    input[type="checkbox"] {
+      transform: scale(1.2);
+    }
+    label { margin-right: 10px; }
+    .clickable { cursor: pointer; }
+    #previewImage { max-width: 100%; max-height: 100%; border: 1px solid #555; }
+    #loginBtn { margin-bottom: 10px; }
+    #status { margin-bottom: 10px; color: lightgreen; }
+  </style>
+</head>
+<body>
+<div class="main">
+<h1>Моя база аніме-фігурок (Google Drive)</h1>
+<div id="status">Не підключено до Google</div>
+<button id="loginBtn" onclick="handleAuthClick()">Увійти з Google</button><button id="openDriveBtn" style="display:none; margin-left:10px;" type="button">Відкрити JSON у Google Drive</button><button id="openDriveBtn" style="display:none;" type="button">Відкрити JSON у Google Drive</button>
+<form id="addForm" style="display:none;">
+<input id="link" placeholder="Посилання на джерело (Telegram, Instagram...)" required="" type="url"/>
+<input accept="image/*" id="imgFile" type="file"/>
+<input id="release" placeholder="Дата виходу (напр. 12.2025)" type="text"/>
+<input id="price" placeholder="Ціна ($ або грн)" type="text"/>
+<label><input id="preorder" type="checkbox"/> Передзамовлено</label>
+<label><input id="deposit" type="checkbox"/> Передплата</label>
+<label><input id="paid" type="checkbox"/> Повна оплата</label>
+<button type="submit">Додати</button>
+</form>
+<table id="figuresTable">
+<thead>
+<tr>
+<th>Фото</th>
+<th>Посилання</th>
+<th class="clickable" id="sortRelease">Дата виходу</th>
+<th class="clickable" id="sortPrice">Ціна</th>
+<th class="clickable" id="sortPreorder">Передзамовлено</th>
+<th class="clickable" id="sortDeposit">Передплата</th>
+<th class="clickable" id="sortPaid">Повна оплата</th>
+<th>✖</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+</div>
+<div class="sidebar">
+<h3>Передперегляд</h3>
+<div id="imagePreviewBox">
+<img alt="preview" id="previewImage" src="https://via.placeholder.com/300x300.png?text=Preview"/>
+</div>
+</div>
+<script>
+    const CLIENT_ID = '647188066279-5rakesgjmesas5sev9td6u05t4ib7ea0.apps.googleusercontent.com';
+    const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+    let tokenClient;
+    let gapiInited = false;
+    let gisInited = false;
+    let fileId = null;
+    let data = [];
+
+    function gapiLoaded() {
+      gapi.load('client', initializeGapiClient);
+    }
+    async function initializeGapiClient() {
+      await gapi.client.init({ apiKey: '', discoveryDocs: [
+        'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'] });
+      gapiInited = true;
+    }
+    function gisLoaded() {
+      tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: CLIENT_ID,
+        scope: SCOPES,
+        callback: '',
+      });
+      gisInited = true;
+    }
+    function handleAuthClick() {
+      tokenClient.callback = async (resp) => {
+        if (resp.error !== undefined) throw resp;
+        document.getElementById('status').textContent = '🔐 Підключено до Google Drive';
+        document.getElementById('loginBtn').style.display = 'none';
+        document.getElementById('addForm').style.display = '';
+        await loadFiguresFromDrive();
+        render();
+      };
+      tokenClient.requestAccessToken({ prompt: 'consent' });
+    }
+    async function loadFiguresFromDrive() {
+      const res = await gapi.client.drive.files.list({
+        q: "name='figures.json' and trashed=false",
+        fields: 'files(id, name)',
+        spaces: 'drive'
+      });
+      const files = res.result.files;
+      if (files && files.length > 0) {
+        fileId = files[0].id;
+        const file = await gapi.client.drive.files.get({ fileId, alt: 'media' });
+        data = JSON.parse(file.body);
+      } else {
+        const blob = new Blob([JSON.stringify([])], { type: 'application/json' });
+        const metadata = { name: 'figures.json', mimeType: 'application/json' };
+        const form = new FormData();
+        form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+        form.append('file', blob);
+        const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+          method: 'POST',
+          headers: new Headers({ 'Authorization': 'Bearer ' + gapi.auth.getToken().access_token }),
+          body: form
+        });
+        const result = await res.json();
+        fileId = result.id;
+        data = [];
+      }
+    }
+    async function saveToDrive() {
+      const content = JSON.stringify(data);
+      await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + gapi.auth.getToken().access_token
+        },
+        body: content
+      });
+    }
+    function render() {
+      const table = document.getElementById('figuresTable').querySelector('tbody');
+      table.innerHTML = '';
+      data.forEach((item, i) => {
+        const row = document.createElement('tr');
+        const img = item.img || 'https://via.placeholder.com/100x100?text=No+Image';
+        row.innerHTML = `
+          <td><img src="${img}" onclick="document.getElementById('previewImage').src='${img}'"></td>
+          <td><a href="${item.link}" target="_blank">Посилання</a></td>
+          <td>${item.release}</td>
+          <td>${item.price}</td>
+          <td class="clickable" onclick="toggle(${i}, 'preorder')">${item.preorder ? '✅' : '❌'}</td>
+          <td class="clickable" onclick="toggle(${i}, 'deposit')">${item.deposit ? '✅' : '❌'}</td>
+          <td class="clickable" onclick="toggle(${i}, 'paid')">${item.paid ? '✅' : '❌'}</td>
+          <td><button onclick="remove(${i})">🗑</button></td>
+        `;
+        table.appendChild(row);
+      });
+    }
+    async function toggle(i, field) {
+      data[i][field] = !data[i][field];
+      await saveToDrive();
+      render();
+    }
+    async function remove(i) {
+      data.splice(i, 1);
+      await saveToDrive();
+      render();
+    }
+    document.getElementById('addForm').onsubmit = async e => {
+      e.preventDefault();
+      const form = e.target;
+      const reader = new FileReader();
+      const file = form.imgFile.files[0];
+      if (file) {
+        reader.onload = async () => {
+          await addEntry(reader.result);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        await addEntry('');
+      }
+    };
+    async function addEntry(imgData) {
+      const entry = {
+        link: document.getElementById('link').value.trim(),
+        img: imgData,
+        release: document.getElementById('release').value.trim(),
+        price: document.getElementById('price').value.trim(),
+        preorder: document.getElementById('preorder').checked,
+        deposit: document.getElementById('deposit').checked,
+        paid: document.getElementById('paid').checked
+      };
+      data.push(entry);
+      await saveToDrive();
+      render();
+      document.getElementById('addForm').reset();
+    }
+    window.gapiLoaded = gapiLoaded;
+    window.gisLoaded = gisLoaded;
+  </script>
+<script async="" defer="" onload="gapiLoaded()" src="https://apis.google.com/js/api.js"></script>
+<script async="" defer="" onload="gisLoaded()" src="https://accounts.google.com/gsi/client"></script>
+<script>
+let folderId = null;
+let fileId; // only declared once globally
+let openBtn;
+
+window.addEventListener('DOMContentLoaded', () => {
+  openBtn = document.getElementById('openDriveBtn');
+});
+
+async function ensureFolderAndFile() {
+  console.log("🔍 Checking or creating FiguresBase folder...");
+  try {
+    const folderRes = await gapi.client.drive.files.list({
+      q: "mimeType='application/vnd.google-apps.folder' and name='FiguresBase' and trashed=false",
+      fields: "files(id, name)"
+    });
+
+    if (folderRes.result.files.length > 0) {
+      folderId = folderRes.result.files[0].id;
+      console.log("✅ Found folder:", folderId);
+    } else {
+      const folderMetadata = {
+        name: "FiguresBase",
+        mimeType: "application/vnd.google-apps.folder"
+      };
+      const folderCreate = await gapi.client.drive.files.create({
+        resource: folderMetadata,
+        fields: "id"
+      });
+      folderId = folderCreate.result.id;
+      console.log("📁 Created folder:", folderId);
+    }
+
+    const fileRes = await gapi.client.drive.files.list({
+      q: `'${folderId}' in parents and name='figures.json' and trashed=false`,
+      fields: "files(id, name)"
+    });
+
+    if (fileRes.result.files.length > 0) {
+      fileId = fileRes.result.files[0].id;
+      const file = await gapi.client.drive.files.get({ fileId, alt: 'media' });
+      try {
+        data = JSON.parse(file.body);
+      } catch (e) {
+        console.warn("⚠️ Could not parse JSON:", e);
+        data = [];
+      }
+      console.log("📥 Loaded data:", data);
+    } else {
+      const blob = new Blob([JSON.stringify([])], { type: 'application/json' });
+      const metadata = { name: 'figures.json', mimeType: 'application/json', parents: [folderId] };
+      const form = new FormData();
+      form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+      form.append('file', blob);
+      const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+        method: 'POST',
+        headers: new Headers({ 'Authorization': 'Bearer ' + gapi.auth.getToken().access_token }),
+        body: form
+      });
+      const result = await res.json();
+      fileId = result.id;
+      data = [];
+      console.log("🆕 Created figures.json:", fileId);
+    }
+
+    if (openBtn) {
+      openBtn.style.display = '';
+      openBtn.onclick = () => {
+        window.open(`https://drive.google.com/file/d/${fileId}/view`, '_blank');
+      };
+    }
+
+  } catch (err) {
+    console.error("❌ Google Drive error:", err);
+    alert("Помилка доступу до Google Drive API. Перевір чи API увімкнено в Google Cloud Console.");
+  }
+}
+
+async function saveToDrive() {
+  if (!fileId) {
+    console.warn("❌ Cannot save: fileId is undefined.");
+    return;
+  }
+  const content = JSON.stringify(data);
+  try {
+    await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + gapi.auth.getToken().access_token
+      },
+      body: content
+    });
+    console.log("✅ Збережено успішно");
+  } catch (err) {
+    console.error("❌ Помилка при збереженні:", err);
+    alert("Помилка при збереженні на Google Drive. Перевір дозволи й підключення.");
+  }
+}
+
+handleAuthClick = function () {
+  tokenClient.callback = async (resp) => {
+    if (resp.error !== undefined) throw resp;
+    document.getElementById('status').textContent = '🔐 Підключено до Google Drive';
+    document.getElementById('loginBtn').style.display = 'none';
+    document.getElementById('addForm').style.display = '';
+    await ensureFolderAndFile();
+    render();
+  };
+  tokenClient.requestAccessToken({ prompt: 'consent' });
+};
+</script><script>
+let sortState = {
+  release: 1,
+  price: 1,
+  preorder: 1,
+  deposit: 1,
+  paid: 1
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+  const byId = id => document.getElementById(id);
+
+  byId('sortRelease')?.addEventListener('click', () => {
+    sortState.release *= -1;
+    data.sort((a, b) => (a.release || '').localeCompare(b.release || '') * sortState.release);
+    render();
+  });
+
+  byId('sortPrice')?.addEventListener('click', () => {
+    sortState.price *= -1;
+    data.sort((a, b) => {
+      const aPrice = parseFloat((a.price || '').replace(/[^\d\.]/g, '')) || 0;
+      const bPrice = parseFloat((b.price || '').replace(/[^\d\.]/g, '')) || 0;
+      return (aPrice - bPrice) * sortState.price;
+    });
+    render();
+  });
+
+  byId('sortPreorder')?.addEventListener('click', () => {
+    sortState.preorder *= -1;
+    data.sort((a, b) => ((a.preorder === b.preorder) ? 0 : a.preorder ? -1 : 1) * sortState.preorder);
+    render();
+  });
+
+  byId('sortDeposit')?.addEventListener('click', () => {
+    sortState.deposit *= -1;
+    data.sort((a, b) => ((a.deposit === b.deposit) ? 0 : a.deposit ? -1 : 1) * sortState.deposit);
+    render();
+  });
+
+  byId('sortPaid')?.addEventListener('click', () => {
+    sortState.paid *= -1;
+    data.sort((a, b) => ((a.paid === b.paid) ? 0 : a.paid ? -1 : 1) * sortState.paid);
+    render();
+  });
+});
+</script></body>
+</html>
