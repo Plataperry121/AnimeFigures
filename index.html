@@ -91,7 +91,7 @@
     let tokenClient;
     let gapiInited = false;
     let gisInited = false;
-    let fileId = null;
+    fileId = null;
     let data = [];
 
     function gapiLoaded() {
@@ -224,7 +224,7 @@
 <script async="" defer="" onload="gisLoaded()" src="https://accounts.google.com/gsi/client"></script>
 <script>
 let folderId = null;
-let fileId; // only declared once globally
+fileId; // only declared once globally
 let openBtn;
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -334,6 +334,41 @@ handleAuthClick = function () {
   tokenClient.requestAccessToken({ prompt: 'consent' });
 };
 </script><script>
+function attachSortHandlers() {
+  const byId = id => document.getElementById(id);
+  if (!byId('sortRelease')) return;
+
+  byId('sortRelease').onclick = () => {
+    sortState.release *= -1;
+    data.sort((a, b) => (a.release || '').localeCompare(b.release || '') * sortState.release);
+    render();
+  };
+  byId('sortPrice').onclick = () => {
+    sortState.price *= -1;
+    data.sort((a, b) => {
+      const aPrice = parseFloat((a.price || '').replace(/[^\d\.]/g, '')) || 0;
+      const bPrice = parseFloat((b.price || '').replace(/[^\d\.]/g, '')) || 0;
+      return (aPrice - bPrice) * sortState.price;
+    });
+    render();
+  };
+  byId('sortPreorder').onclick = () => {
+    sortState.preorder *= -1;
+    data.sort((a, b) => ((a.preorder === b.preorder) ? 0 : a.preorder ? -1 : 1) * sortState.preorder);
+    render();
+  };
+  byId('sortDeposit').onclick = () => {
+    sortState.deposit *= -1;
+    data.sort((a, b) => ((a.deposit === b.deposit) ? 0 : a.deposit ? -1 : 1) * sortState.deposit);
+    render();
+  };
+  byId('sortPaid').onclick = () => {
+    sortState.paid *= -1;
+    data.sort((a, b) => ((a.paid === b.paid) ? 0 : a.paid ? -1 : 1) * sortState.paid);
+    render();
+  };
+}
+
 let sortState = {
   release: 1,
   price: 1,
@@ -342,42 +377,11 @@ let sortState = {
   paid: 1
 };
 
-document.addEventListener('DOMContentLoaded', () => {
-  const byId = id => document.getElementById(id);
-
-  byId('sortRelease')?.addEventListener('click', () => {
-    sortState.release *= -1;
-    data.sort((a, b) => (a.release || '').localeCompare(b.release || '') * sortState.release);
-    render();
-  });
-
-  byId('sortPrice')?.addEventListener('click', () => {
-    sortState.price *= -1;
-    data.sort((a, b) => {
-      const aPrice = parseFloat((a.price || '').replace(/[^\d\.]/g, '')) || 0;
-      const bPrice = parseFloat((b.price || '').replace(/[^\d\.]/g, '')) || 0;
-      return (aPrice - bPrice) * sortState.price;
-    });
-    render();
-  });
-
-  byId('sortPreorder')?.addEventListener('click', () => {
-    sortState.preorder *= -1;
-    data.sort((a, b) => ((a.preorder === b.preorder) ? 0 : a.preorder ? -1 : 1) * sortState.preorder);
-    render();
-  });
-
-  byId('sortDeposit')?.addEventListener('click', () => {
-    sortState.deposit *= -1;
-    data.sort((a, b) => ((a.deposit === b.deposit) ? 0 : a.deposit ? -1 : 1) * sortState.deposit);
-    render();
-  });
-
-  byId('sortPaid')?.addEventListener('click', () => {
-    sortState.paid *= -1;
-    data.sort((a, b) => ((a.paid === b.paid) ? 0 : a.paid ? -1 : 1) * sortState.paid);
-    render();
-  });
-});
+// Attach handlers once data is loaded
+const originalRender = render;
+render = () => {
+  originalRender();
+  attachSortHandlers();
+};
 </script></body>
 </html>
