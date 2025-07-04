@@ -224,15 +224,23 @@
 <script async="" defer="" onload="gisLoaded()" src="https://accounts.google.com/gsi/client"></script>
 <script>
 let folderId = null;
-let openBtn = document.getElementById('openDriveBtn');
+let fileId = null;
+let openBtn;
+
+window.addEventListener('DOMContentLoaded', () => {
+  openBtn = document.getElementById('openDriveBtn');
+});
 
 async function ensureFolderAndFile() {
+  console.log("🔍 Checking or creating FiguresBase folder...");
+
   const folderRes = await gapi.client.drive.files.list({
     q: "mimeType='application/vnd.google-apps.folder' and name='FiguresBase' and trashed=false",
     fields: "files(id, name)"
   });
   if (folderRes.result.files.length > 0) {
     folderId = folderRes.result.files[0].id;
+    console.log("✅ Found folder:", folderId);
   } else {
     const folderMetadata = {
       name: "FiguresBase",
@@ -243,6 +251,7 @@ async function ensureFolderAndFile() {
       fields: "id"
     });
     folderId = folderCreate.result.id;
+    console.log("📁 Created folder:", folderId);
   }
 
   const fileRes = await gapi.client.drive.files.list({
@@ -253,7 +262,13 @@ async function ensureFolderAndFile() {
   if (fileRes.result.files.length > 0) {
     fileId = fileRes.result.files[0].id;
     const file = await gapi.client.drive.files.get({ fileId, alt: 'media' });
-    data = JSON.parse(file.body);
+    try {
+      data = JSON.parse(file.body);
+    } catch (e) {
+      console.warn("⚠️ Could not parse JSON:", e);
+      data = [];
+    }
+    console.log("📥 Loaded data:", data);
   } else {
     const blob = new Blob([JSON.stringify([])], { type: 'application/json' });
     const metadata = { name: 'figures.json', mimeType: 'application/json', parents: [folderId] };
@@ -268,12 +283,34 @@ async function ensureFolderAndFile() {
     const result = await res.json();
     fileId = result.id;
     data = [];
+    console.log("🆕 Created figures.json file:", fileId);
   }
 
-  openBtn.style.display = '';
-  openBtn.onclick = () => {
-    window.open(`https://drive.google.com/file/d/${fileId}/view`, '_blank');
-  };
+  if (openBtn) {
+    openBtn.style.display = '';
+    openBtn.onclick = () => {
+      window.open(`https://drive.google.com/file/d/${fileId}/view`, '_blank');
+    };
+  } else {
+    console.warn("❗️openBtn not found");
+  }
+}
+
+async function saveToDrive() {
+  if (!fileId) {
+    console.warn("❌ No fileId to save to!");
+    return;
+  }
+  const content = JSON.stringify(data);
+  console.log("💾 Saving to Drive...", content);
+  await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + gapi.auth.getToken().access_token
+    },
+    body: content
+  });
 }
 
 handleAuthClick = function () {
