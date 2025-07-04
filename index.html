@@ -82,7 +82,7 @@
 <div class="sidebar">
 <h3>Передперегляд</h3>
 <div id="imagePreviewBox">
-<img alt="preview" id="previewImage" src="https://via.placeholder.com/300x300?text=Preview"/>
+<img alt="preview" id="previewImage" src="https://via.placeholder.com/300x300.png?text=Preview"/>
 </div>
 </div>
 <script>
@@ -224,7 +224,7 @@
 <script async="" defer="" onload="gisLoaded()" src="https://accounts.google.com/gsi/client"></script>
 <script>
 let folderId = null;
-let fileId = null;
+let fileId; // only declared once globally
 let openBtn;
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -233,84 +233,93 @@ window.addEventListener('DOMContentLoaded', () => {
 
 async function ensureFolderAndFile() {
   console.log("🔍 Checking or creating FiguresBase folder...");
-
-  const folderRes = await gapi.client.drive.files.list({
-    q: "mimeType='application/vnd.google-apps.folder' and name='FiguresBase' and trashed=false",
-    fields: "files(id, name)"
-  });
-  if (folderRes.result.files.length > 0) {
-    folderId = folderRes.result.files[0].id;
-    console.log("✅ Found folder:", folderId);
-  } else {
-    const folderMetadata = {
-      name: "FiguresBase",
-      mimeType: "application/vnd.google-apps.folder"
-    };
-    const folderCreate = await gapi.client.drive.files.create({
-      resource: folderMetadata,
-      fields: "id"
+  try {
+    const folderRes = await gapi.client.drive.files.list({
+      q: "mimeType='application/vnd.google-apps.folder' and name='FiguresBase' and trashed=false",
+      fields: "files(id, name)"
     });
-    folderId = folderCreate.result.id;
-    console.log("📁 Created folder:", folderId);
-  }
 
-  const fileRes = await gapi.client.drive.files.list({
-    q: `'${folderId}' in parents and name='figures.json' and trashed=false`,
-    fields: "files(id, name)"
-  });
-
-  if (fileRes.result.files.length > 0) {
-    fileId = fileRes.result.files[0].id;
-    const file = await gapi.client.drive.files.get({ fileId, alt: 'media' });
-    try {
-      data = JSON.parse(file.body);
-    } catch (e) {
-      console.warn("⚠️ Could not parse JSON:", e);
-      data = [];
+    if (folderRes.result.files.length > 0) {
+      folderId = folderRes.result.files[0].id;
+      console.log("✅ Found folder:", folderId);
+    } else {
+      const folderMetadata = {
+        name: "FiguresBase",
+        mimeType: "application/vnd.google-apps.folder"
+      };
+      const folderCreate = await gapi.client.drive.files.create({
+        resource: folderMetadata,
+        fields: "id"
+      });
+      folderId = folderCreate.result.id;
+      console.log("📁 Created folder:", folderId);
     }
-    console.log("📥 Loaded data:", data);
-  } else {
-    const blob = new Blob([JSON.stringify([])], { type: 'application/json' });
-    const metadata = { name: 'figures.json', mimeType: 'application/json', parents: [folderId] };
-    const form = new FormData();
-    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-    form.append('file', blob);
-    const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-      method: 'POST',
-      headers: new Headers({ 'Authorization': 'Bearer ' + gapi.auth.getToken().access_token }),
-      body: form
-    });
-    const result = await res.json();
-    fileId = result.id;
-    data = [];
-    console.log("🆕 Created figures.json file:", fileId);
-  }
 
-  if (openBtn) {
-    openBtn.style.display = '';
-    openBtn.onclick = () => {
-      window.open(`https://drive.google.com/file/d/${fileId}/view`, '_blank');
-    };
-  } else {
-    console.warn("❗️openBtn not found");
+    const fileRes = await gapi.client.drive.files.list({
+      q: `'${folderId}' in parents and name='figures.json' and trashed=false`,
+      fields: "files(id, name)"
+    });
+
+    if (fileRes.result.files.length > 0) {
+      fileId = fileRes.result.files[0].id;
+      const file = await gapi.client.drive.files.get({ fileId, alt: 'media' });
+      try {
+        data = JSON.parse(file.body);
+      } catch (e) {
+        console.warn("⚠️ Could not parse JSON:", e);
+        data = [];
+      }
+      console.log("📥 Loaded data:", data);
+    } else {
+      const blob = new Blob([JSON.stringify([])], { type: 'application/json' });
+      const metadata = { name: 'figures.json', mimeType: 'application/json', parents: [folderId] };
+      const form = new FormData();
+      form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+      form.append('file', blob);
+      const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+        method: 'POST',
+        headers: new Headers({ 'Authorization': 'Bearer ' + gapi.auth.getToken().access_token }),
+        body: form
+      });
+      const result = await res.json();
+      fileId = result.id;
+      data = [];
+      console.log("🆕 Created figures.json:", fileId);
+    }
+
+    if (openBtn) {
+      openBtn.style.display = '';
+      openBtn.onclick = () => {
+        window.open(`https://drive.google.com/file/d/${fileId}/view`, '_blank');
+      };
+    }
+
+  } catch (err) {
+    console.error("❌ Google Drive error:", err);
+    alert("Помилка доступу до Google Drive API. Перевір чи API увімкнено в Google Cloud Console.");
   }
 }
 
 async function saveToDrive() {
   if (!fileId) {
-    console.warn("❌ No fileId to save to!");
+    console.warn("❌ Cannot save: fileId is undefined.");
     return;
   }
   const content = JSON.stringify(data);
-  console.log("💾 Saving to Drive...", content);
-  await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer ' + gapi.auth.getToken().access_token
-    },
-    body: content
-  });
+  try {
+    await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + gapi.auth.getToken().access_token
+      },
+      body: content
+    });
+    console.log("✅ Збережено успішно");
+  } catch (err) {
+    console.error("❌ Помилка при збереженні:", err);
+    alert("Помилка при збереженні на Google Drive. Перевір дозволи й підключення.");
+  }
 }
 
 handleAuthClick = function () {
